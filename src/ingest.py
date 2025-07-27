@@ -4,6 +4,7 @@ from typing import List
 from api import fetch_latest_launch, fetch_all_launches, fetch_launches_after_date
 from models import Launch
 from database import Database
+from aggregations import AggregationService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -21,10 +22,12 @@ class IncrementalIngestionPipeline:
     2. Real-World Pattern: Implements Change Data Capture (CDC) pattern  
     3. FETCHING: Uses server-side filtering to fetch only latest data
     4. Demonstrates Key Concepts: Idempotency, efficiency monitoring, and proper error handling
+    5. Aggregation Maintenance: Updates aggregation tables incrementally
     """
 
     def __init__(self):
         self.db = Database()
+        self.aggregation_service = AggregationService(self.db)
 
     def run_incremental_ingestion(self) -> dict:
         """
@@ -55,7 +58,8 @@ class IncrementalIngestionPipeline:
                     'pipeline_duration_seconds': (datetime.now() - start_time).total_seconds(),
                     'api_calls_made': 1,  # Only /latest call
                     'early_exit': True,
-                    'optimization': 'change_detection_early_exit'
+                    'optimization': 'change_detection_early_exit',
+                    'aggregations': {'status': 'skipped', 'reason': 'no_new_data'}
                 }
 
             # Step 3: Incremental Fetch - Only fetch launches after high water mark
@@ -74,7 +78,8 @@ class IncrementalIngestionPipeline:
                     'api_calls_made': 2,  # /latest + /launches/query
                     'early_exit': False,
                     'optimization': 'server_side_filtering',
-                    'pagination_handled': True
+                    'pagination_handled': True,
+                    'aggregations': {'status': 'skipped', 'reason': 'no_new_launches'}
                 }
 
             # Step 4: Data Validation and Processing
@@ -90,6 +95,11 @@ class IncrementalIngestionPipeline:
             logger.info("Step 6: Updating ingestion state")
             self._update_ingestion_state(validated_launches)
 
+            # Step 7: Update Aggregations
+            logger.info("Step 7: Updating aggregations")
+            aggregation_result = self.aggregation_service.update_aggregations_for_new_launches(
+                validated_launches)
+
             # Pipeline Success
             duration = (datetime.now() - start_time).total_seconds()
             logger.info(
@@ -103,7 +113,8 @@ class IncrementalIngestionPipeline:
                 'api_calls_made': 2,  # /latest + /launches/query
                 'early_exit': False,
                 'optimization': 'server_side_filtering',
-                'pagination_handled': True
+                'pagination_handled': True,
+                'aggregations': aggregation_result
             }
 
         except Exception as e:
@@ -164,6 +175,11 @@ class IncrementalIngestionPipeline:
             logger.info("Step 4: Updating ingestion state")
             self._update_ingestion_state(validated_launches)
 
+            # Step 5: Initialize/Update Aggregations
+            logger.info("Step 5: Initializing aggregations")
+            # For initial load, we calculate aggregations from scratch
+            aggregation_result = self.aggregation_service.initialize_aggregations_from_scratch()
+
             # Initial Load Success
             duration = (datetime.now() - start_time).total_seconds()
             logger.info(
@@ -177,7 +193,8 @@ class IncrementalIngestionPipeline:
                 'api_calls_made': 1,  # Only /launches/all call
                 'early_exit': False,
                 'optimization': 'initial_load_skip_change_detection',
-                'initial_load': True
+                'initial_load': True,
+                'aggregations': aggregation_result
             }
 
         except Exception as e:
@@ -401,8 +418,21 @@ if __name__ == "__main__":
     print(f"Duration: {result['pipeline_duration_seconds']:.2f} seconds")
     print(f"API calls made: {result.get('api_calls_made', 0)}")
 
+    # Aggregation summary
+    agg_result = result.get('aggregations', {})
+
+    if agg_result.get('status') == 'success':
+        print(
+            f"Aggregations updated: Total launches: {agg_result.get('total_launches', 'N/A')}, Success rate: {agg_result.get('success_rate', 'N/A')}%")
+    elif agg_result.get('status') == 'skipped':
+        print(
+            f"Aggregations skipped: {agg_result.get('reason', 'unknown reason')}")
+    elif agg_result.get('status') == 'error':
+        print(
+            f"Aggregation error: {agg_result.get('error_message', 'Unknown error')}")
+
     if result.get('initial_load'):
-        print("Initial load completed - all launches fetched without change detection")
+        print("Initial load completed - all launches fetched and aggregations initialized")
     elif result.get('early_exit'):
         print("Pipeline completed early - no new data detected")
 

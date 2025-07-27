@@ -133,8 +133,11 @@ graph LR
 cd docker
 docker-compose up -d
 
-# Verify services
+# Verify services running
 docker-compose ps
+
+# (Optional) To delete services (and restart)
+docker-compose down -v && docker-compose up -d
 ```
 
 ### 2. Install Dependencies
@@ -172,8 +175,26 @@ python src/ingest.py
 # PostgreSQL (raw storage)
 docker exec -it postgres psql -U postgres -d mydatabase -c "SELECT COUNT(*) FROM raw_launches;"
 
+# Check aggregations
+docker exec -it postgres psql -U postgres -d mydatabase -c "SELECT * FROM launch_aggregations;"
+
 # Trino (analytics queries)
 docker exec -it trino trino --execute "SELECT COUNT(*) FROM postgresql.public.raw_launches;"
+```
+
+### 5. Test Aggregations
+
+```bash
+# Test aggregation functionality
+python src/test_aggregations.py
+
+# Expected output:
+# === Testing Time-Series Aggregation Functionality ===
+# ✓ Data consistency check passed
+# ✓ Database count matches aggregation
+# ✓ Records are properly ordered by timestamp
+# Total Launches: 205, Success Rate: 67.32%
+# Found 2 aggregation snapshots with trend analysis
 ```
 
 ## Database Schema
@@ -192,6 +213,33 @@ CREATE TABLE raw_launches (
     ingested_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 ```
+
+### Aggregation Table
+
+```sql
+CREATE TABLE launch_aggregations (
+    id SERIAL PRIMARY KEY,
+    total_launches BIGINT NOT NULL DEFAULT 0,
+    total_successful_launches BIGINT NOT NULL DEFAULT 0,
+    total_failed_launches BIGINT NOT NULL DEFAULT 0,
+    success_rate DECIMAL(5,2),
+    earliest_launch_date TIMESTAMPTZ,
+    latest_launch_date TIMESTAMPTZ,
+    total_launch_sites BIGINT DEFAULT 0,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    last_processed_launch_date TIMESTAMPTZ
+);
+```
+
+The aggregation table maintains pre-computed metrics using **time-series approach**:
+
+- **Total Launches**: Count of all launches in the system
+- **Success/Failure Counts**: Breakdown by launch outcome
+- **Success Rate**: Calculated percentage of successful launches
+- **Date Range**: Earliest and latest launch dates
+- **Launch Sites**: Count of unique launch locations
+- **Time-Series Tracking**: Historical snapshots for trend analysis
+- **Pipeline Traceability**: Track which pipeline run created each record
 
 ## Pipeline Implementation
 
@@ -332,6 +380,45 @@ cd src && python -c "from database import Database; db = Database(); print(f'Lau
 cd src && python -c "from api import fetch_latest_launch; print(fetch_latest_launch()['name'])" && cd ..
 ```
 
+## Aggregation Strategy
+
+### Time-Series Approach for Trend Analysis
+
+The aggregation table uses **time-series records** for comprehensive trend analysis:
+
+```mermaid
+graph LR
+    NEW[New Launches] --> CALC[Calculate New State]
+    CALC --> SNAPSHOT[Create Snapshot Record]
+    SNAPSHOT --> INSERT[INSERT New Record]
+    INSERT --> TRACK[Track Pipeline Run]
+    
+    classDef process fill:#e1f5fe,color:#000000
+    class NEW,CALC,SNAPSHOT,INSERT,TRACK process
+```
+
+**Benefits of Time-Series Approach**:
+
+- **Trend Analysis**: Track how metrics evolve over time
+- **Historical Insights**: See success rate improvements and launch frequency changes
+- **Audit Trail**: Complete history of aggregation changes
+- **Business Intelligence**: Answer questions like "When did we reach 200 launches?"
+
+### Aggregation Monitoring
+
+Monitor aggregation health and trends with provided SQL queries:
+
+```bash
+# Time-series trend analysis
+docker exec -it postgres psql -U postgres -d mydatabase -f /docker-entrypoint-initdb.d/analytics/aggregation_time_series_queries.sql
+
+# Validate aggregation accuracy and test time-series functionality
+python src/test_aggregations.py
+
+# View aggregation trends over time
+python src/test_aggregations.py | grep -A 20 "Aggregation Trends Over Time"
+```
+
 ## Monitoring Output
 
 ```json
@@ -341,10 +428,42 @@ cd src && python -c "from api import fetch_latest_launch; print(fetch_latest_lau
     "pipeline_duration_seconds": 0.33,
     "api_calls_made": 2,
     "early_exit": false,
-    "optimization": "server_side_filtering"
+    "optimization": "server_side_filtering",
+    "aggregations": {
+        "status": "success",
+        "launches_processed": 3,
+        "total_launches": 208,
+        "success_rate": 67.31,
+        "method": "time_series_incremental",
+        "pipeline_run_id": "pipeline_20241215_143022_a1b2c3d4",
+        "aggregation_id": 15
+    }
 }
 ```
 
+### Time-Series Trend Analysis
+
+View how your metrics evolve over time:
+
+```bash
+# Example trend output
+Date/Time               | Launches | Success Rate | Type       | Batch Size | Run ID
+---------------------------------------------------------------------------------------
+2024-12-15 14:30:22     |      208 |       67.31% | incremental|          3 | pipeline_20241215_143022
+2024-12-15 12:15:18     |      205 |       67.32% | initial    |        205 | initial_20241215_121518
+```
+
+## Aggregation Table Design Evolution
+
+### Real-World Analytics Enabled
+
+With time-series aggregations, you can now answer questions like:
+
+- "How has our success rate improved since 2020?"
+- "What's our average launch frequency per month?"
+- "When did we reach each launch milestone?"
+- "How many launches were added in each pipeline run?"
+
 ---
 
-*This pipeline demonstrates production-ready data engineering with 80% data reduction optimization while maintaining complete data accuracy and reliability.*
+*This pipeline demonstrates production-ready data engineering with time-series aggregation patterns for comprehensive trend analysis and business intelligence.*

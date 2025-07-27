@@ -76,3 +76,37 @@ class Launch(BaseModel):
             return [v]
 
         return list(v)
+
+
+class LaunchAggregations(BaseModel):
+    """
+    Pydantic model for launch aggregation data.
+
+    Supports time-series tracking for trend analysis over time.
+    """
+    id: Optional[int] = None  # Auto-generated for new records
+    total_launches: int = 0
+    total_successful_launches: int = 0
+    total_failed_launches: int = 0
+    success_rate: Optional[float] = None
+    earliest_launch_date: Optional[datetime] = None
+    latest_launch_date: Optional[datetime] = None
+    total_launch_sites: int = 0
+    updated_at: datetime = Field(default_factory=lambda: datetime.now())
+    last_processed_launch_date: Optional[datetime] = None
+    # Time-series fields
+    snapshot_type: str = "incremental"  # 'initial', 'incremental', 'manual'
+    launches_added_in_batch: int = 0
+    pipeline_run_id: Optional[str] = None
+
+    class Config:
+        """Pydantic configuration."""
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None
+        }
+
+    def calculate_success_rate(self) -> Optional[float]:
+        """Calculate success rate from total and successful launches."""
+        if self.total_launches == 0:
+            return None
+        return round((self.total_successful_launches / self.total_launches) * 100, 2)
