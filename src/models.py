@@ -95,6 +95,7 @@ class LaunchAggregations(BaseModel):
     latest_launch_date: Optional[datetime] = None
     total_launch_sites: int = 0
     average_payload_mass_kg: Optional[float] = None
+    average_delay_hours: Optional[float] = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now())
     last_processed_launch_date: Optional[datetime] = None
     # Time-series fields

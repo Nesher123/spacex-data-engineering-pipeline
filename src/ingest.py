@@ -333,7 +333,7 @@ class IncrementalIngestionPipeline:
 
                 # Calculate total payload mass by fetching payload data
                 if launch.payload_ids:
-                    logger.debug(
+                    logger.info(
                         f"Calculating payload mass for launch {launch.id} with {len(launch.payload_ids)} payloads")
                     total_mass = calculate_total_payload_mass(
                         launch.payload_ids)
@@ -376,7 +376,7 @@ class IncrementalIngestionPipeline:
                 logger.info(
                     f"Successfully inserted {inserted_count} new launches")
             else:
-                logger.info("No new launches inserted (all were duplicates)")
+                logger.info("No new launches inserted (all were duplicates/updates)")
 
             return inserted_count
 

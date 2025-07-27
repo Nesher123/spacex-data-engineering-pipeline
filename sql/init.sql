@@ -32,6 +32,7 @@ CREATE TABLE
         latest_launch_date TIMESTAMPTZ,
         total_launch_sites BIGINT DEFAULT 0,
         average_payload_mass_kg DECIMAL(10, 2),
+        average_delay_hours DECIMAL(10, 2),
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         last_processed_launch_date TIMESTAMPTZ,
         -- Time-series fields for trend analysis

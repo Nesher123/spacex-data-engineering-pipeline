@@ -227,7 +227,7 @@ def fetch_payloads_batch(payload_ids: List[str]) -> List[Dict[str, Any]]:
             logger.debug("No payload IDs provided")
             return []
 
-        logger.info(f"Fetching {len(payload_ids)} payloads in batch")
+        logger.debug(f"Fetching {len(payload_ids)} payloads in batch")
         payloads = []
 
         # Fetch each payload individually
@@ -241,7 +241,7 @@ def fetch_payloads_batch(payload_ids: List[str]) -> List[Dict[str, Any]]:
                     f"Failed to fetch payload {payload_id}, skipping: {e}")
                 continue
 
-        logger.info(
+        logger.debug(
             f"Successfully fetched {len(payloads)} out of {len(payload_ids)} payloads")
         return payloads
 

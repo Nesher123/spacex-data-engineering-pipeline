@@ -137,20 +137,31 @@ class Database:
                     text("""
                         INSERT INTO raw_launches (launch_id, mission_name, date_utc, success, payload_ids, total_payload_mass_kg, launchpad_id, static_fire_date_utc)
                         VALUES (:id, :name, :date_utc, :success, :payload_ids, :total_payload_mass_kg, :launchpad_id, :static_fire_date_utc)
-                        ON CONFLICT (launch_id) DO NOTHING
+                        ON CONFLICT (launch_id) DO UPDATE SET
+                            mission_name = EXCLUDED.mission_name,
+                            date_utc = EXCLUDED.date_utc,
+                            success = EXCLUDED.success,
+                            payload_ids = EXCLUDED.payload_ids,
+                            total_payload_mass_kg = EXCLUDED.total_payload_mass_kg,
+                            launchpad_id = EXCLUDED.launchpad_id,
+                            static_fire_date_utc = EXCLUDED.static_fire_date_utc,
+                            ingested_at = CURRENT_TIMESTAMP
                     """),
                     launch_data
                 )
 
-                # Get count after insert to determine how many were actually inserted
+                # Get count after upsert to determine how many new records were added
+                # Note: This counts only NEW launches, not updates to existing ones
                 count_after = session.execute(
                     text("SELECT COUNT(*) FROM raw_launches")).scalar()
-                inserted_count = count_after - count_before
+                new_launches_count = count_after - count_before
 
                 session.commit()
                 logger.info(
-                    f"Batch insert completed: {inserted_count} new launches inserted out of {len(launches)} processed")
-                return inserted_count
+                    f"Batch upsert completed: {new_launches_count} new launches added, "
+                    f"{len(launches) - new_launches_count} existing launches updated, "
+                    f"{len(launches)} total launches processed")
+                return new_launches_count
 
             except Exception as e:
                 session.rollback()
