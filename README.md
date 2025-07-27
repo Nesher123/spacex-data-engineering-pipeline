@@ -1,6 +1,6 @@
 # SpaceX Data Engineering Pipeline
 
-Data Engineering Assignment - Trino + PostgreSQL with Incremental Ingestion
+Trino + PostgreSQL with Incremental Ingestion
 
 ## Overview
 
@@ -126,6 +126,17 @@ graph LR
 
 ## Quick Start
 
+## Configuration
+
+### Environment Variables
+
+```bash
+# PostgreSQL Configuration (copy to an .env file)
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=mysecretpassword
+POSTGRES_DB=mydatabase
+```
+
 ### 1. Setup Instructions
 
 ```bash
@@ -175,11 +186,8 @@ python src/ingest.py
 # PostgreSQL (raw storage)
 docker exec -it postgres psql -U postgres -d mydatabase -c "SELECT COUNT(*) FROM raw_launches;"
 
-# Check aggregations
-docker exec -it postgres psql -U postgres -d mydatabase -c "SELECT * FROM launch_aggregations;"
-
-# Trino (analytics queries)
-docker exec -it trino trino --execute "SELECT COUNT(*) FROM postgresql.public.raw_launches;"
+# Check aggregations with Trino (analytics queries)
+docker exec -it trino trino --execute "SELECT * FROM postgresql.public.launch_aggregations;"
 ```
 
 ### 5. Test Aggregations
@@ -236,6 +244,8 @@ The aggregation table maintains pre-computed metrics using **time-series approac
 - **Total Launches**: Count of all launches in the system
 - **Success/Failure Counts**: Breakdown by launch outcome
 - **Success Rate**: Calculated percentage of successful launches
+- **Average Payload Mass**: Mean payload mass across all launches (kg)
+- **Average Delay Hours**: Mean delay between static fire test and actual launch
 - **Date Range**: Earliest and latest launch dates
 - **Launch Sites**: Count of unique launch locations
 - **Time-Series Tracking**: Historical snapshots for trend analysis
@@ -322,22 +332,6 @@ def run_incremental_ingestion(self) -> dict:
 | **New Data Available** | 2 (latest + filtered) | ~0.3s | Server-side filtering |
 | **Initial Load** | 1 (all launches) | ~1.2s | Skip change detection |
 
-## Configuration
-
-### Environment Variables
-
-```bash
-# PostgreSQL Configuration
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=password
-POSTGRES_DB=mydatabase
-
-# API Configuration (optional)
-SPACEX_API_TIMEOUT=30
-BATCH_SIZE=100
-LOG_LEVEL=INFO
-```
-
 ## Design Choices and Assumptions
 
 ### Data Model Selection
@@ -355,10 +349,12 @@ LOG_LEVEL=INFO
 
 ### Database Design
 
-- **Append-Only Raw Table**: Maintains complete data lineage
+- **Upsert Strategy**: `INSERT ... ON CONFLICT DO UPDATE` ensures latest data is captured
+- **Data Currency**: Updates existing launches with newest information (success status, payload mass, etc.)
 - **TIMESTAMPTZ**: Proper timezone handling for UTC data
 - **JSONB for Arrays**: Efficient storage of payload ID lists
 - **Separate Aggregation Table**: Pre-computed metrics for fast analytics
+- **Audit Trail**: `ingested_at` timestamp tracks when data was last updated
 
 ### Technology Stack
 
@@ -409,14 +405,16 @@ graph LR
 Monitor aggregation health and trends with provided SQL queries:
 
 ```bash
-# Time-series trend analysis
-docker exec -it postgres psql -U postgres -d mydatabase -f /docker-entrypoint-initdb.d/analytics/aggregation_time_series_queries.sql
+# Run queries with Trino:
+docker exec -it trino trino
 
-# Validate aggregation accuracy and test time-series functionality
-python src/test_aggregations.py
+# Then, paste a query below after the `trino>` clause
+   SELECT 
+      *
+   FROM postgresql.public.launch_aggregations 
+   ORDER BY updated_at DESC, id DESC;
 
-# View aggregation trends over time
-python src/test_aggregations.py | grep -A 20 "Aggregation Trends Over Time"
+# You should paste the analytics queries for this task (in sql/analytics)
 ```
 
 ## Monitoring Output
