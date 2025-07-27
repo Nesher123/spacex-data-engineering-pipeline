@@ -1,6 +1,6 @@
 import os
-import logging
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy import create_engine, text
@@ -11,21 +11,51 @@ from models import Launch
 logger = logging.getLogger(__name__)
 
 
+class DatabaseConfigError(Exception):
+    """Raised when database configuration is invalid or incomplete."""
+    pass
+
+
 class Database:
     def __init__(self):
-        # Database connection configuration
-        # Use localhost for local development, postgres for containerized deployment
+        # Database connection configuration with secure defaults
         db_host = os.getenv('POSTGRES_HOST', 'localhost')
         db_port = os.getenv('POSTGRES_PORT', '5432')
-        db_user = os.getenv('POSTGRES_USER', 'postgres')
-        # Match docker-compose.yml
-        db_password = os.getenv('POSTGRES_PASSWORD', 'mysecretpassword')
-        db_name = os.getenv('POSTGRES_DB', 'mydatabase')
+        db_user = os.getenv('POSTGRES_USER')
+        db_password = os.getenv('POSTGRES_PASSWORD')
+        db_name = os.getenv('POSTGRES_DB')
+
+        # Validate required credentials are provided
+        if not db_user:
+            raise DatabaseConfigError(
+                "POSTGRES_USER environment variable is required")
+        if not db_password:
+            raise DatabaseConfigError(
+                "POSTGRES_PASSWORD environment variable is required")
+        if not db_name:
+            raise DatabaseConfigError(
+                "POSTGRES_DB environment variable is required")
+
+        # Validate password strength (basic check)
+        if len(db_password) < 8:
+            logger.warning(
+                "Database password is shorter than 8 characters. Consider using a stronger password.")
 
         db_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-        logger.info(f"Connecting to database at {db_host}:{db_port}")
 
-        self.engine = create_engine(db_url)
+        # Log connection info WITHOUT sensitive data
+        logger.info(
+            f"Connecting to database at {db_host}:{db_port}/{db_name} as user '{db_user}'")
+
+        self.engine = create_engine(
+            db_url,
+            # Security: Don't echo SQL statements that might contain sensitive data
+            echo=False,
+            # Connection pool settings for better resource management
+            pool_size=5,
+            max_overflow=10,
+            pool_pre_ping=True  # Verify connections before use
+        )
         self.Session = sessionmaker(bind=self.engine)
 
     def get_last_fetched_date(self) -> datetime:
@@ -74,8 +104,8 @@ class Database:
 
             if row:
                 # Convert row to dict for Launch model
-                # Deserialize JSONB payload_ids back to Python list
-                payload_ids = json.loads(row[4]) if row[4] else []
+                # JSONB payload_ids is already parsed by PostgreSQL
+                payload_ids = row[4] if row[4] else []
 
                 launch_data = {
                     'id': row[0],
@@ -122,7 +152,7 @@ class Database:
                         'name': launch.name,
                         'date_utc': launch.date_utc,
                         'success': launch.success,
-                        'payload_ids': json.dumps(launch.payload_ids) if launch.payload_ids else json.dumps([]),
+                        'payload_ids': json.dumps(launch.payload_ids if launch.payload_ids else []),
                         'total_payload_mass_kg': launch.total_payload_mass_kg,
                         'launchpad_id': launch.launchpad_id,
                         'static_fire_date_utc': launch.static_fire_date_utc
