@@ -6,6 +6,9 @@ from typing import Optional, List
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from models import Launch
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Get logger without configuring it (let main pipeline handle configuration)
 logger = logging.getLogger(__name__)
