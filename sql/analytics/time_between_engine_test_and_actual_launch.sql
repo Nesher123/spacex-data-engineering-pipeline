@@ -20,7 +20,7 @@ SELECT
         2
     ) AS max_delay_hours
 FROM
-    raw_launches
+    postgresql.public.raw_launches
 WHERE
     static_fire_date_utc IS NOT NULL
     AND date_utc IS NOT NULL

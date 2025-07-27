@@ -8,7 +8,7 @@ SELECT
     success,
     launchpad_id
 FROM
-    raw_launches
+    postgresql.public.raw_launches
 WHERE
     total_payload_mass_kg IS NOT NULL
 ORDER BY
@@ -16,7 +16,7 @@ ORDER BY
 LIMIT
     5;
 
---             launch_id         |              mission_name               |            date_utc            | total_payload_mass_kg>
+--         launch_id         |              mission_name               |            date_utc            | total_payload_mass_kg>
 -- --------------------------+-----------------------------------------+--------------------------------+---------------------->
 --  5ed9819a1f30554030d45c29 | Starlink-9 (v1.0) & BlackSky Global 5-6 | 2020-08-07 05:12:00.000000 UTC |              15712.00>
 --  5eb87d3cffd86e000604b380 | Starlink-2                              | 2020-01-07 02:19:00.000000 UTC |              15600.00>

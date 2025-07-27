@@ -8,7 +8,7 @@ SELECT
     ) AS year,
     ROUND(AVG(success_rate), 2) AS avg_success_rate
 FROM
-    launch_aggregations
+    postgresql.public.launch_aggregations
 WHERE
     success_rate IS NOT NULL
 GROUP BY

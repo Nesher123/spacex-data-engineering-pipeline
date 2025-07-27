@@ -5,7 +5,7 @@ SELECT
     COUNT(*) AS total_launches,
     ROUND(AVG(total_payload_mass_kg), 2) AS average_payload_mass_kg
 FROM
-    raw_launches
+    postgresql.public.raw_launches
 WHERE
     launchpad_id IS NOT NULL
 GROUP BY
