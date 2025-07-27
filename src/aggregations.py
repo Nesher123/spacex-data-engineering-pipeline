@@ -158,7 +158,7 @@ class AggregationService:
                 SELECT 
                     id, total_launches, total_successful_launches, total_failed_launches,
                     success_rate, earliest_launch_date, latest_launch_date,
-                    total_launch_sites, updated_at, last_processed_launch_date,
+                    total_launch_sites, average_payload_mass_kg, updated_at, last_processed_launch_date,
                     snapshot_type, launches_added_in_batch, pipeline_run_id
                 FROM launch_aggregations 
                 ORDER BY updated_at DESC, id DESC
@@ -177,11 +177,12 @@ class AggregationService:
                     earliest_launch_date=row[5],
                     latest_launch_date=row[6],
                     total_launch_sites=row[7] or 0,
-                    updated_at=row[8] or datetime.now(),
-                    last_processed_launch_date=row[9],
-                    snapshot_type=row[10] or "unknown",
-                    launches_added_in_batch=row[11] or 0,
-                    pipeline_run_id=row[12]
+                    average_payload_mass_kg=float(row[8]) if row[8] else None,
+                    updated_at=row[9] or datetime.now(),
+                    last_processed_launch_date=row[10],
+                    snapshot_type=row[11] or "unknown",
+                    launches_added_in_batch=row[12] or 0,
+                    pipeline_run_id=row[13]
                 )
             else:
                 # Return empty aggregations if none exist
@@ -202,7 +203,7 @@ class AggregationService:
                 SELECT 
                     id, total_launches, total_successful_launches, total_failed_launches,
                     success_rate, earliest_launch_date, latest_launch_date,
-                    total_launch_sites, updated_at, last_processed_launch_date,
+                    total_launch_sites, average_payload_mass_kg, updated_at, last_processed_launch_date,
                     snapshot_type, launches_added_in_batch, pipeline_run_id
                 FROM launch_aggregations 
                 ORDER BY updated_at DESC, id DESC
@@ -220,11 +221,12 @@ class AggregationService:
                     earliest_launch_date=row[5],
                     latest_launch_date=row[6],
                     total_launch_sites=row[7] or 0,
-                    updated_at=row[8] or datetime.now(),
-                    last_processed_launch_date=row[9],
-                    snapshot_type=row[10] or "unknown",
-                    launches_added_in_batch=row[11] or 0,
-                    pipeline_run_id=row[12]
+                    average_payload_mass_kg=float(row[8]) if row[8] else None,
+                    updated_at=row[9] or datetime.now(),
+                    last_processed_launch_date=row[10],
+                    snapshot_type=row[11] or "unknown",
+                    launches_added_in_batch=row[12] or 0,
+                    pipeline_run_id=row[13]
                 ))
 
             return history
@@ -251,7 +253,8 @@ class AggregationService:
             total_failed_launches=current_agg.total_failed_launches,
             earliest_launch_date=current_agg.earliest_launch_date,
             latest_launch_date=current_agg.latest_launch_date,
-            total_launch_sites=current_agg.total_launch_sites
+            total_launch_sites=current_agg.total_launch_sites,
+            average_payload_mass_kg=current_agg.average_payload_mass_kg
         )
 
         # Track unique launch sites for incremental counting
@@ -287,6 +290,9 @@ class AggregationService:
         # Calculate success rate
         updated_agg.success_rate = updated_agg.calculate_success_rate()
 
+        # Calculate average payload mass (full recount for accuracy)
+        updated_agg.average_payload_mass_kg = self._calculate_average_payload_mass()
+
         # Update processed date
         if new_launches:
             updated_agg.last_processed_launch_date = max(
@@ -313,7 +319,8 @@ class AggregationService:
                     COUNT(CASE WHEN success = false THEN 1 END) as failed_launches,
                     MIN(date_utc) as earliest_launch,
                     MAX(date_utc) as latest_launch,
-                    COUNT(DISTINCT launchpad_id) as unique_launch_sites
+                    COUNT(DISTINCT launchpad_id) as unique_launch_sites,
+                    AVG(total_payload_mass_kg) as avg_payload_mass
                 FROM raw_launches
             """))
 
@@ -339,6 +346,7 @@ class AggregationService:
                     earliest_launch_date=row[3],
                     latest_launch_date=row[4],
                     total_launch_sites=row[5] or 0,
+                    average_payload_mass_kg=float(row[6]) if row[6] else None,
                     last_processed_launch_date=row[4]  # Latest launch date
                 )
             else:
@@ -360,6 +368,22 @@ class AggregationService:
             """))
             return result.scalar() or 0
 
+    def _calculate_average_payload_mass(self) -> Optional[float]:
+        """
+        Calculate average payload mass from all launches.
+
+        Returns:
+            float: Average payload mass in kg, or None if no valid data
+        """
+        with self.db.Session() as session:
+            result = session.execute(text("""
+                SELECT AVG(total_payload_mass_kg) 
+                FROM raw_launches 
+                WHERE total_payload_mass_kg IS NOT NULL AND total_payload_mass_kg > 0
+            """))
+            avg_mass = result.scalar()
+            return float(avg_mass) if avg_mass else None
+
     def _insert_new_aggregation_record(self, aggregations: LaunchAggregations) -> None:
         """
         Insert new aggregation record (time-series approach).
@@ -373,12 +397,12 @@ class AggregationService:
                     INSERT INTO launch_aggregations (
                         total_launches, total_successful_launches, total_failed_launches,
                         success_rate, earliest_launch_date, latest_launch_date,
-                        total_launch_sites, updated_at, last_processed_launch_date,
+                        total_launch_sites, average_payload_mass_kg, updated_at, last_processed_launch_date,
                         snapshot_type, launches_added_in_batch, pipeline_run_id
                     ) VALUES (
                         :total_launches, :total_successful_launches, :total_failed_launches,
                         :success_rate, :earliest_launch_date, :latest_launch_date,
-                        :total_launch_sites, :updated_at, :last_processed_launch_date,
+                        :total_launch_sites, :average_payload_mass_kg, :updated_at, :last_processed_launch_date,
                         :snapshot_type, :launches_added_in_batch, :pipeline_run_id
                     ) RETURNING id
                 """), {
@@ -389,6 +413,7 @@ class AggregationService:
                     'earliest_launch_date': aggregations.earliest_launch_date,
                     'latest_launch_date': aggregations.latest_launch_date,
                     'total_launch_sites': aggregations.total_launch_sites,
+                    'average_payload_mass_kg': aggregations.average_payload_mass_kg,
                     'updated_at': aggregations.updated_at,
                     'last_processed_launch_date': aggregations.last_processed_launch_date,
                     'snapshot_type': aggregations.snapshot_type,

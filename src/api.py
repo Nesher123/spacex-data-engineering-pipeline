@@ -11,6 +11,7 @@ SPACEX_API_BASE = "https://api.spacexdata.com/v4"
 LAUNCHES_ENDPOINT = f"{SPACEX_API_BASE}/launches"
 LAUNCHES_QUERY_ENDPOINT = f"{SPACEX_API_BASE}/launches/query"
 LATEST_ENDPOINT = f"{SPACEX_API_BASE}/launches/latest"
+PAYLOADS_ENDPOINT = f"{SPACEX_API_BASE}/payloads"
 
 
 def fetch_latest_launch() -> Dict[str, Any]:
@@ -171,3 +172,112 @@ def fetch_launches_after_date(date_threshold: datetime) -> List[Dict[str, Any]]:
     except ValueError as e:
         logger.error(f"Invalid JSON response from filtered launches: {e}")
         raise
+
+
+def fetch_payload_data(payload_id: str) -> Dict[str, Any]:
+    """
+    Fetch individual payload data from SpaceX API.
+
+    Args:
+        payload_id: The ID of the payload to fetch
+
+    Returns:
+        dict: Payload data including mass_kg and other details
+
+    Raises:
+        requests.RequestException: If API call fails
+        ValueError: If response is invalid
+    """
+    try:
+        url = f"{PAYLOADS_ENDPOINT}/{payload_id}"
+        logger.debug(f"Fetching payload data for ID: {payload_id}")
+
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+
+        data = response.json()
+        logger.debug(
+            f"Fetched payload: {data.get('name', 'Unknown')} with mass {data.get('mass_kg', 'Unknown')} kg")
+        return data
+
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch payload {payload_id}: {e}")
+        raise
+    except ValueError as e:
+        logger.error(f"Invalid JSON response for payload {payload_id}: {e}")
+        raise
+
+
+def fetch_payloads_batch(payload_ids: List[str]) -> List[Dict[str, Any]]:
+    """
+    Fetch multiple payload data from SpaceX API efficiently.
+
+    Args:
+        payload_ids: List of payload IDs to fetch
+
+    Returns:
+        List[dict]: List of payload data with mass_kg and other details
+
+    Raises:
+        requests.RequestException: If API calls fail
+        ValueError: If responses are invalid
+    """
+    try:
+        if not payload_ids:
+            logger.debug("No payload IDs provided")
+            return []
+
+        logger.info(f"Fetching {len(payload_ids)} payloads in batch")
+        payloads = []
+
+        # Fetch each payload individually
+        # Note: SpaceX API v4 doesn't support batch payload fetching, so we need individual calls
+        for payload_id in payload_ids:
+            try:
+                payload_data = fetch_payload_data(payload_id)
+                payloads.append(payload_data)
+            except Exception as e:
+                logger.warning(
+                    f"Failed to fetch payload {payload_id}, skipping: {e}")
+                continue
+
+        logger.info(
+            f"Successfully fetched {len(payloads)} out of {len(payload_ids)} payloads")
+        return payloads
+
+    except Exception as e:
+        logger.error(f"Failed to fetch payloads batch: {e}")
+        raise
+
+
+def calculate_total_payload_mass(payload_ids: List[str]) -> float:
+    """
+    Calculate total payload mass for a launch by fetching payload data.
+
+    Args:
+        payload_ids: List of payload IDs from a launch
+
+    Returns:
+        float: Total mass in kg, or 0.0 if no valid mass data found
+    """
+    try:
+        if not payload_ids:
+            return 0.0
+
+        payloads = fetch_payloads_batch(payload_ids)
+        total_mass = 0.0
+        valid_payloads = 0
+
+        for payload in payloads:
+            mass_kg = payload.get('mass_kg')
+            if mass_kg is not None and isinstance(mass_kg, (int, float)) and mass_kg > 0:
+                total_mass += mass_kg
+                valid_payloads += 1
+
+        logger.debug(
+            f"Calculated total mass: {total_mass} kg from {valid_payloads} valid payloads")
+        return total_mass
+
+    except Exception as e:
+        logger.error(f"Failed to calculate total payload mass: {e}")
+        return 0.0

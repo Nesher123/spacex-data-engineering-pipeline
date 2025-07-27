@@ -64,7 +64,7 @@ class Database:
         """
         with self.Session() as session:
             result = session.execute(text("""
-                SELECT launch_id, mission_name, date_utc, success, payload_ids, launchpad_id, static_fire_date_utc
+                SELECT launch_id, mission_name, date_utc, success, payload_ids, total_payload_mass_kg, launchpad_id, static_fire_date_utc
                 FROM raw_launches 
                 ORDER BY date_utc DESC 
                 LIMIT 1
@@ -84,9 +84,10 @@ class Database:
                     'date_utc': row[2],
                     'success': row[3],
                     'payloads': payload_ids,
-                    'launchpad': row[5],
+                    'total_payload_mass_kg': row[5],
+                    'launchpad': row[6],
                     # TIMESTAMPTZ automatically returns timezone-aware datetime
-                    'static_fire_date_utc': row[6]
+                    'static_fire_date_utc': row[7]
                 }
                 launch = Launch(**launch_data)
                 logger.info(
@@ -122,6 +123,7 @@ class Database:
                         'date_utc': launch.date_utc,
                         'success': launch.success,
                         'payload_ids': json.dumps(launch.payload_ids) if launch.payload_ids else json.dumps([]),
+                        'total_payload_mass_kg': launch.total_payload_mass_kg,
                         'launchpad_id': launch.launchpad_id,
                         'static_fire_date_utc': launch.static_fire_date_utc
                     })
@@ -133,8 +135,8 @@ class Database:
                 # Batch insert with conflict handling
                 session.execute(
                     text("""
-                        INSERT INTO raw_launches (launch_id, mission_name, date_utc, success, payload_ids, launchpad_id, static_fire_date_utc)
-                        VALUES (:id, :name, :date_utc, :success, :payload_ids, :launchpad_id, :static_fire_date_utc)
+                        INSERT INTO raw_launches (launch_id, mission_name, date_utc, success, payload_ids, total_payload_mass_kg, launchpad_id, static_fire_date_utc)
+                        VALUES (:id, :name, :date_utc, :success, :payload_ids, :total_payload_mass_kg, :launchpad_id, :static_fire_date_utc)
                         ON CONFLICT (launch_id) DO NOTHING
                     """),
                     launch_data

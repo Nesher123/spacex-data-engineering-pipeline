@@ -6,6 +6,7 @@ CREATE TABLE
         date_utc TIMESTAMPTZ NOT NULL,
         success BOOLEAN,
         payload_ids JSONB,
+        total_payload_mass_kg DECIMAL(10, 2),
         launchpad_id VARCHAR,
         static_fire_date_utc TIMESTAMPTZ,
         ingested_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -30,6 +31,7 @@ CREATE TABLE
         earliest_launch_date TIMESTAMPTZ,
         latest_launch_date TIMESTAMPTZ,
         total_launch_sites BIGINT DEFAULT 0,
+        average_payload_mass_kg DECIMAL(10, 2),
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         last_processed_launch_date TIMESTAMPTZ,
         -- Time-series fields for trend analysis

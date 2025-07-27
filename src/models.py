@@ -18,6 +18,8 @@ class Launch(BaseModel):
         None, alias="success", description="Launch success status")
     payload_ids: Optional[List[str]] = Field(
         default_factory=list, alias="payloads", description="List of payload IDs")
+    total_payload_mass_kg: Optional[float] = Field(
+        None, description="Total payload mass in kilograms")
     launchpad_id: Optional[str] = Field(
         None, alias="launchpad", description="Launchpad identifier")
     static_fire_date_utc: Optional[datetime] = Field(
@@ -92,6 +94,7 @@ class LaunchAggregations(BaseModel):
     earliest_launch_date: Optional[datetime] = None
     latest_launch_date: Optional[datetime] = None
     total_launch_sites: int = 0
+    average_payload_mass_kg: Optional[float] = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now())
     last_processed_launch_date: Optional[datetime] = None
     # Time-series fields

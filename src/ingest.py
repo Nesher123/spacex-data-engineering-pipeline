@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from typing import List
-from api import fetch_latest_launch, fetch_all_launches, fetch_launches_after_date
+from api import fetch_latest_launch, fetch_all_launches, fetch_launches_after_date, calculate_total_payload_mass
 from models import Launch
 from database import Database
 from aggregations import AggregationService
@@ -313,6 +313,7 @@ class IncrementalIngestionPipeline:
     def _validate_launches(self, launch_data_list: List[dict]) -> List[Launch]:
         """
         Validate launch data using Pydantic models for data quality assurance.
+        Also calculates total payload mass for each launch by fetching payload data.
 
         This demonstrates proper data validation patterns in data pipelines.
 
@@ -320,7 +321,7 @@ class IncrementalIngestionPipeline:
             launch_data_list: Raw launch data from API
 
         Returns:
-            List[Launch]: Validated Launch objects
+            List[Launch]: Validated Launch objects with payload mass data
         """
         validated_launches = []
         validation_errors = 0
@@ -329,6 +330,20 @@ class IncrementalIngestionPipeline:
             try:
                 # Data Quality: Validate each launch with Pydantic
                 launch = Launch(**launch_data)
+
+                # Calculate total payload mass by fetching payload data
+                if launch.payload_ids:
+                    logger.debug(
+                        f"Calculating payload mass for launch {launch.id} with {len(launch.payload_ids)} payloads")
+                    total_mass = calculate_total_payload_mass(
+                        launch.payload_ids)
+                    launch.total_payload_mass_kg = total_mass if total_mass > 0 else None
+                    logger.debug(
+                        f"Launch {launch.id} total payload mass: {launch.total_payload_mass_kg} kg")
+                else:
+                    launch.total_payload_mass_kg = None
+                    logger.debug(f"Launch {launch.id} has no payloads")
+
                 validated_launches.append(launch)
 
             except Exception as e:
