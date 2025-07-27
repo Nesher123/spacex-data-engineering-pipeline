@@ -1,3 +1,4 @@
+-- Top Payload Masses
 -- List the top 5 launches with the heaviest total payload mass.
 SELECT
     launch_id,

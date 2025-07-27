@@ -1,3 +1,4 @@
+-- Launch Site Utilization
 -- How many launches have occurred at each launch site, and what's the average payload per site?
 SELECT
     launchpad_id AS launch_site,
