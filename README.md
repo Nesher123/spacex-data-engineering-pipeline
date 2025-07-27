@@ -96,7 +96,6 @@ uv run python src/ingest.py
 === Starting Incremental Ingestion Pipeline ===
 Initial load: Fetched 205 launches
 Aggregations updated successfully
-Pipeline completed in 1.2s
 ```
 
 ### 4. Verify Data Ingestion
