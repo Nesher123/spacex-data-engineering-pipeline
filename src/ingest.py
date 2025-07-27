@@ -282,6 +282,7 @@ class IncrementalIngestionPipeline:
 
             # Filter for new launches
             new_launches = []
+
             for launch_data in all_launches:
                 try:
                     # Parse launch date for comparison
@@ -376,7 +377,8 @@ class IncrementalIngestionPipeline:
                 logger.info(
                     f"Successfully inserted {inserted_count} new launches")
             else:
-                logger.info("No new launches inserted (all were duplicates/updates)")
+                logger.info(
+                    "No new launches inserted (all were duplicates/updates)")
 
             return inserted_count
 
