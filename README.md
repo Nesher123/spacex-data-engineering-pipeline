@@ -58,7 +58,7 @@ POSTGRES_PASSWORD=mysecretpassword
 POSTGRES_DB=mydatabase
 ```
 
-### 1. Prerequisites
+### 2. Prerequisites
 
 ```bash
 # Install uv (Python package manager)
@@ -66,7 +66,7 @@ pip install uv
 # OR on macOS: brew install uv
 ```
 
-### 2. Start Infrastructure
+### 3. Start Infrastructure
 
 ```bash
 # Start Trino + PostgreSQL
@@ -80,7 +80,7 @@ docker-compose ps
 docker-compose down -v && docker-compose up -d
 ```
 
-### 3. Install Dependencies & Run Pipeline
+### 4. Install Dependencies & Run Pipeline
 
 ```bash
 # Install Python dependencies
