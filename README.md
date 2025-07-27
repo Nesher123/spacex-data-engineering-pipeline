@@ -49,6 +49,15 @@ graph TB
 
 ## Quick Start
 
+### 1. Set Environment Variables
+
+```bash
+# Create and .env file with this PostgreSQL configuration
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=mysecretpassword
+POSTGRES_DB=mydatabase
+```
+
 ### 1. Prerequisites
 
 ```bash
@@ -78,7 +87,7 @@ docker-compose down -v && docker-compose up -d
 uv sync
 
 # Run incremental ingestion pipeline
-python src/ingest.py
+uv run python src/ingest.py
 ```
 
 **Expected Output:**
@@ -97,7 +106,7 @@ Pipeline completed in 1.2s
 docker exec -it postgres psql -U postgres -d mydatabase -c "SELECT COUNT(*) FROM raw_launches;"
 
 # Check aggregations via Trino
-docker exec -it trino trino --execute "SELECT * FROM postgresql.public.launch_aggregations;"
+docker exec -it trino trino --execute "SELECT * FROM postgresql.public.launch_aggregations LIMIT 5;"
 ```
 
 ## Database Schema
@@ -224,20 +233,20 @@ flowchart LR
 
 ```bash
 # Run main ingestion
-python src/ingest.py
+uv run src/ingest.py
 
 # Test aggregation logic
-python src/test_aggregations.py
+uv run src/test_aggregations.py
 ```
 
 ### Test Database Connectivity
 
 ```bash
 # PostgreSQL connection test
-cd src && python -c "from database import Database; db = Database(); print(f'Last fetch: {db.get_last_fetched_date()}')" && cd ..
+cd src && uv run python -c "from database import Database; db = Database(); print(f'Last fetch: {db.get_last_fetched_date()}')" && cd ..
 
 # API connectivity test  
-cd src && python -c "from api import fetch_latest_launch; print(fetch_latest_launch()['name'])" && cd ..
+cd src && uv run python -c "from api import fetch_latest_launch; print(fetch_latest_launch()['name'])" && cd ..
 ```
 
 ### Verify Data Quality
@@ -259,17 +268,6 @@ FROM postgresql.public.raw_launches;"
 | **No New Data** | 1 | ~0.5s | Minimal (latest only) |
 | **New Data** | 3 | ~1s | Filtered (date range) + get payload mass |
 | **Initial Load** | 2 | ~15s | Full dataset + get payload mass |
-
-## Configuration
-
-### Environment Variables
-
-```bash
-# PostgreSQL Configuration (.env file)
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=mysecretpassword
-POSTGRES_DB=mydatabase
-```
 
 ### Project Structure
 
